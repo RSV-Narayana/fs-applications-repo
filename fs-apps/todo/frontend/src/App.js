@@ -1,66 +1,37 @@
-import React, { useEffect, useState } from "react";
+import React, { Suspense, lazy } from "react";
+import { useSelector } from "react-redux";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-const API_URL = process.env.REACT_APP_API_URL || "/api/todos";
+const Login = lazy(() => import("./pages/Login"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const TodoList = lazy(() => import("./pages/TodoList"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const Profile = lazy(() => import("./pages/Profile"));
+const PublicHome = lazy(() => import("./pages/PublicHome"));
+
+function ProtectedRoute({ children, role }) {
+  const { isAuthenticated, role: userRole } = useSelector((state) => state.user);
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (role && userRole !== role) return <Navigate to="/dashboard" />;
+  return children;
+}
 
 function App() {
-  const [todos, setTodos] = useState([]);
-  const [text, setText] = useState("");
-
-  useEffect(() => {
-    fetch(API_URL)
-      .then((res) => res.json())
-      .then(setTodos);
-  }, []);
-
-  const addTodo = async () => {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    const todo = await res.json();
-    setTodos([...todos, todo]);
-    setText("");
-  };
-
-  const toggleTodo = async (id, completed) => {
-    const res = await fetch(`${API_URL}/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed }),
-    });
-    const updated = await res.json();
-    setTodos(todos.map((t) => (t._id === id ? updated : t)));
-  };
-
-  const deleteTodo = async (id) => {
-    await fetch(`${API_URL}/${id}`, { method: "DELETE" });
-    setTodos(todos.filter((t) => t._id !== id));
-  };
-
+  const { isAuthenticated } = useSelector((state) => state.user);
   return (
-    <div style={{ maxWidth: 400, margin: "auto" }}>
-      <h2>Todo List</h2>
-      <input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Add todo"
-      />
-      <button onClick={addTodo}>Add</button>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo._id}>
-            <span
-              style={{ textDecoration: todo.completed ? "line-through" : "none", cursor: "pointer" }}
-              onClick={() => toggleTodo(todo._id, !todo.completed)}
-            >
-              {todo.text}
-            </span>
-            <button onClick={() => deleteTodo(todo._id)}>Delete</button>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <Router>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" /> : <PublicHome />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>}>
+            <Route path="todos" element={<ProtectedRoute><TodoList /></ProtectedRoute>} />
+            <Route path="admin" element={<ProtectedRoute role="admin"><AdminPanel /></ProtectedRoute>} />
+            <Route path="profile" element={<ProtectedRoute role="user"><Profile /></ProtectedRoute>} />
+          </Route>
+        </Routes>
+      </Suspense>
+    </Router>
   );
 }
 
