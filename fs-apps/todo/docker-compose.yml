@@ -1,0 +1,47 @@
+version: '3.8'
+services:
+  mongo:
+    image: mongo:6
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+  backend:
+    build: ./backend
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - mongo
+  frontend1:
+    build: ./frontend
+    restart: always
+    depends_on:
+      - backend
+    expose:
+      - "80"
+
+  frontend2:
+    build: ./frontend
+    restart: always
+    depends_on:
+      - backend
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+    depends_on:
+      - frontend1
+      - frontend2
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/ssl/nginx.crt:/etc/nginx/ssl/nginx.crt
+      - ./frontend/ssl/nginx.key:/etc/nginx/ssl/nginx.key
+volumes:
+  mongo-data:
